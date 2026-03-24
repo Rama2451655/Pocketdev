@@ -1,0 +1,80 @@
+version: '3.9'
+
+services:
+  # ---- EXECUTION SERVER ----
+  execution-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: pocketdev-execution-server:latest
+    container_name: pocketdev-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET}
+      - MAX_EXEC_TIME=30
+      - SANDBOX_ROOT=/tmp/pocketdev-sandboxes
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+    volumes:
+      - sandbox_data:/tmp/pocketdev-sandboxes
+    # Security constraints for code execution
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:exec,size=512m
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - pocketdev-network
+
+  # ---- NGINX REVERSE PROXY ----
+  nginx:
+    image: nginx:alpine
+    container_name: pocketdev-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - execution-server
+    networks:
+      - pocketdev-network
+
+  # ---- REDIS (Optional: for session caching) ----
+  redis:
+    image: redis:7-alpine
+    container_name: pocketdev-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - pocketdev-network
+
+volumes:
+  sandbox_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  pocketdev-network:
+    driver: bridge

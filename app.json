@@ -1,0 +1,49 @@
+{
+  "name": "PocketDevIDE",
+  "displayName": "PocketDev IDE",
+  "version": "1.0.0",
+  "private": true,
+  "expo": {
+    "name": "PocketDev IDE",
+    "slug": "pocketdev-ide",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D1117"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.pocketdev.ide",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is not used by PocketDev IDE",
+        "NSMicrophoneUsageDescription": "Microphone is not used by PocketDev IDE",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D1117"
+      },
+      "package": "io.pocketdev.ide",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "react-native-vector-icons",
+      [
+        "react-native-mmkv",
+        {
+          "encryptionKey": "pocketdev-2024"
+        }
+      ]
+    ]
+  }
+}

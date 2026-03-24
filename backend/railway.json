@@ -1,0 +1,15 @@
+# railway.json — Railway deployment config for PocketDev backend
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install"
+  },
+  "deploy": {
+    "startCommand": "node server.js",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>PocketDev Monaco Editor</title>
+
+  <!-- Monaco Editor CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0D1117;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1C2128; }
+    ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #58A6FF; }
+
+    /* Floating toolbar for mobile */
+    #mobile-toolbar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 44px;
+      background: #161B22;
+      border-top: 1px solid #30363D;
+      display: flex;
+      align-items: center;
+      overflow-x: auto;
+      gap: 2px;
+      padding: 4px 8px;
+      z-index: 1000;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #mobile-toolbar::-webkit-scrollbar { display: none; }
+
+    .toolbar-btn {
+      min-width: 36px;
+      height: 32px;
+      border: none;
+      background: #21262D;
+      color: #E6EDF3;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0 8px;
+      white-space: nowrap;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .toolbar-btn:active { background: #30363D; }
+    .toolbar-btn.special { color: #58A6FF; font-weight: bold; }
+
+    .toolbar-sep {
+      width: 1px;
+      height: 24px;
+      background: #30363D;
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    /* Editor adjustment for toolbar */
+    #container { padding-bottom: 44px; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <!-- Mobile code keyboard helpers -->
+  <div id="mobile-toolbar">
+    <!-- Indentation -->
+    <button class="toolbar-btn special" onclick="insertText('\t')" title="Tab">⇥</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Common code chars -->
+    <button class="toolbar-btn" onclick="insertText('{  }')" title="Braces">{}</button>
+    <button class="toolbar-btn" onclick="insertText('[  ]')" title="Brackets">[]</button>
+    <button class="toolbar-btn" onclick="insertText('(  )')" title="Parens">()</button>
+    <button class="toolbar-btn" onclick="insertText('\"\"')" title="Quotes">""</button>
+    <button class="toolbar-btn" onclick="insertText(`''`)" title="Single quotes">''</button>
+    <button class="toolbar-btn" onclick="insertText('\`\`')" title="Backtick">``</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Operators -->
+    <button class="toolbar-btn" onclick="insertText(';')" title="Semicolon">;</button>
+    <button class="toolbar-btn" onclick="insertText(':')" title="Colon">:</button>
+    <button class="toolbar-btn" onclick="insertText('=')" title="Equal">=</button>
+    <button class="toolbar-btn" onclick="insertText('===')" title="Strict Equal">===</button>
+    <button class="toolbar-btn" onclick="insertText('=>')" title="Arrow">=></button>
+    <button class="toolbar-btn" onclick="insertText('+')" title="Plus">+</button>
+    <button class="toolbar-btn" onclick="insertText('-')" title="Minus">-</button>
+    <button class="toolbar-btn" onclick="insertText('*')" title="Star">*</button>
+    <button class="toolbar-btn" onclick="insertText('/')" title="Slash">/</button>
+    <button class="toolbar-btn" onclick="insertText('%')" title="Percent">%</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Navigation -->
+    <button class="toolbar-btn special" onclick="moveCursor('home')" title="Home">↖</button>
+    <button class="toolbar-btn special" onclick="moveCursor('end')" title="End">↘</button>
+    <button class="toolbar-btn special" onclick="moveCursor('up')" title="Up">↑</button>
+    <button class="toolbar-btn special" onclick="moveCursor('down')" title="Down">↓</button>
+    <button class="toolbar-btn special" onclick="moveCursor('left')" title="Left">←</button>
+    <button class="toolbar-btn special" onclick="moveCursor('right')" title="Right">→</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Actions -->
+    <button class="toolbar-btn special" onclick="editorAction('undo')" title="Undo">⎌</button>
+    <button class="toolbar-btn special" onclick="editorAction('redo')" title="Redo">⎊</button>
+    <button class="toolbar-btn" onclick="triggerSuggest()" title="Suggestions">💡</button>
+    <button class="toolbar-btn" onclick="formatDocument()" title="Format">⚡</button>
+    <button class="toolbar-btn" onclick="findReplace()" title="Find">🔍</button>
+
+    <!-- Special keywords per language -->
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="insertText('const ')" title="const">const</button>
+    <button class="toolbar-btn" onclick="insertText('let ')" title="let">let</button>
+    <button class="toolbar-btn" onclick="insertText('function ')" title="function">fn()</button>
+    <button class="toolbar-btn" onclick="insertText('return ')" title="return">ret</button>
+    <button class="toolbar-btn" onclick="insertText('import ')" title="import">imp</button>
+    <button class="toolbar-btn" onclick="insertText('async ')" title="async">async</button>
+    <button class="toolbar-btn" onclick="insertText('await ')" title="await">await</button>
+  </div>
+
+  <script>
+    // ============================================================
+    // POCKETDEV MONACO EDITOR - CORE ENGINE
+    // ============================================================
+
+    let editor = null;
+    let currentTheme = 'pocketdev-dark';
+
+    // --- CUSTOM THEMES ---
+    const DARK_THEME = {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword',      foreground: 'FF7B72', fontStyle: 'bold' },
+        { token: 'string',       foreground: 'A5D6FF' },
+        { token: 'number',       foreground: 'F2CC60' },
+        { token: 'comment',      foreground: '8B949E', fontStyle: 'italic' },
+        { token: 'type',         foreground: 'FFA657' },
+        { token: 'class',        foreground: 'FFA657', fontStyle: 'bold' },
+        { token: 'function',     foreground: 'D2A8FF' },
+        { token: 'variable',     foreground: 'E6EDF3' },
+        { token: 'operator',     foreground: '79C0FF' },
+        { token: 'attribute',    foreground: 'A5D6FF' },
+        { token: 'tag',          foreground: '7EE787' },
+        { token: 'identifier',   foreground: 'E6EDF3' },
+        { token: 'delimiter',    foreground: '8B949E' },
+        { token: 'regexp',       foreground: '7EE787' },
+        { token: 'constant',     foreground: '79C0FF' },
+      ],
+      colors: {
+        'editor.background':            '#0D1117',
+        'editor.foreground':            '#E6EDF3',
+        'editor.lineHighlightBackground': '#161B2260',
+        'editor.selectionBackground':   '#264F78',
+        'editor.inactiveSelectionBackground': '#264F7860',
+        'editorLineNumber.foreground':  '#484F58',
+        'editorLineNumber.activeForeground': '#8B949E',
+        'editorCursor.foreground':      '#58A6FF',
+        'editorWhitespace.foreground':  '#21262D',
+        'editorIndentGuide.background': '#21262D',
+        'editorIndentGuide.activeBackground': '#30363D',
+        'editorGutter.background':      '#0D1117',
+        'editorWidget.background':      '#161B22',
+        'editorWidget.border':          '#30363D',
+        'input.background':             '#0D1117',
+        'input.border':                 '#30363D',
+        'input.foreground':             '#E6EDF3',
+        'dropdown.background':          '#161B22',
+        'dropdown.border':              '#30363D',
+        'list.hoverBackground':         '#21262D',
+        'list.activeSelectionBackground': '#1F4068',
+        'scrollbar.shadow':             '#00000000',
+        'scrollbarSlider.background':   '#484F5880',
+        'scrollbarSlider.hoverBackground': '#6E768180',
+        'scrollbarSlider.activeBackground': '#58A6FF80',
+        'editorBracketMatch.background': '#17273B',
+        'editorBracketMatch.border':    '#58A6FF',
+        'editorError.foreground':       '#F85149',
+        'editorWarning.foreground':     '#D29922',
+        'editorInfo.foreground':        '#58A6FF',
+        'peekView.border':              '#58A6FF',
+        'peekViewResult.background':    '#161B22',
+        'peekViewEditor.background':    '#0D1117',
+        'tab.activeBackground':         '#0D1117',
+        'tab.inactiveBackground':       '#161B22',
+        'tab.border':                   '#30363D',
+        'tab.activeBorderTop':          '#58A6FF',
+        'statusBar.background':         '#161B22',
+        'statusBar.foreground':         '#8B949E',
+        'minimap.background':           '#0D1117',
+        'panel.background':             '#0D1117',
+        'panel.border':                 '#30363D',
+        'sideBar.background':           '#161B22',
+        'sideBar.border':               '#30363D',
+        'activityBar.background':       '#0D1117',
+        'activityBar.foreground':       '#E6EDF3',
+        'activityBar.border':           '#30363D',
+        'titleBar.activeBackground':    '#0D1117',
+        'titleBar.activeForeground':    '#E6EDF3',
+      }
+    };
+
+    const LIGHT_THEME = {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword',   foreground: 'CF222E', fontStyle: 'bold' },
+        { token: 'string',    foreground: '0A3069' },
+        { token: 'number',    foreground: '0550AE' },
+        { token: 'comment',   foreground: '6E7781', fontStyle: 'italic' },
+        { token: 'type',      foreground: '953800' },
+        { token: 'function',  foreground: '8250DF' },
+        { token: 'class',     foreground: '953800', fontStyle: 'bold' },
+        { token: 'operator',  foreground: '0550AE' },
+        { token: 'tag',       foreground: '116329' },
+      ],
+      colors: {
+        'editor.background':  '#FFFFFF',
+        'editor.foreground':  '#1F2328',
+        'editorCursor.foreground': '#0969DA',
+        'editorLineNumber.foreground': '#8C959F',
+        'editorLineNumber.activeForeground': '#57606A',
+      }
+    };
+
+    // --- MONACO LOADER ---
+    require.config({
+      paths: {
+        vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
+      }
+    });
+
+    require(['vs/editor/editor.main'], function() {
+      // Register themes
+      monaco.editor.defineTheme('pocketdev-dark', DARK_THEME);
+      monaco.editor.defineTheme('pocketdev-light', LIGHT_THEME);
+
+      // Create editor
+      editor = monaco.editor.create(document.getElementById('container'), {
+        value: '// Welcome to PocketDev IDE\n// Start coding...\n',
+        language: 'javascript',
+        theme: 'pocketdev-dark',
+
+        // Mobile optimizations
+        fontSize: 14,
+        lineHeight: 22,
+        fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+        fontLigatures: true,
+
+        // Core features
+        minimap: { enabled: false },   // Disabled on mobile (too small)
+        wordWrap: 'on',
+        automaticLayout: true,
+
+        // IntelliSense
+        suggestOnTriggerCharacters: true,
+        quickSuggestions: { other: true, comments: false, strings: true },
+        parameterHints: { enabled: true },
+        inlineSuggest: { enabled: true },
+        acceptSuggestionOnEnter: 'on',
+
+        // Formatting
+        formatOnPaste: true,
+        formatOnType: false,  // Can be slow on mobile
+
+        // Error detection
+        renderValidationDecorations: 'on',
+
+        // Bracket matching
+        matchBrackets: 'always',
+        bracketPairColorization: { enabled: true },
+        guides: { bracketPairs: true, indentation: true },
+
+        // Scroll
+        smoothScrolling: true,
+        scrollBeyondLastLine: false,
+        scrollbar: {
+          verticalScrollbarSize: 8,
+          horizontalScrollbarSize: 8,
+          alwaysConsumeMouseWheel: false,
+        },
+
+        // Touch optimizations
+        mouseWheelZoom: true,
+        multiCursorModifier: 'ctrlCmd',
+        selectionHighlight: true,
+        occurrencesHighlight: true,
+
+        // Code lens & hints
+        codeLens: true,
+        lightbulb: { enabled: true },
+        hover: { enabled: true, delay: 300 },
+
+        // Git diff decorations
+        renderLineHighlight: 'gutter',
+        renderWhitespace: 'boundary',
+
+        // Folding
+        folding: true,
+        foldingStrategy: 'indentation',
+        showFoldingControls: 'mouseover',
+
+        // Padding
+        padding: { top: 12, bottom: 12 },
+        lineNumbers: 'on',
+        glyphMargin: true,
+        lineDecorationsWidth: 6,
+        lineNumbersMinChars: 3,
+      });
+
+      // --- CODE INTELLIGENCE SETUP ---
+      setupIntelliSense();
+
+      // --- EDITOR EVENT LISTENERS ---
+      editor.onDidChangeModelContent(() => {
+        const content = editor.getValue();
+        postMessage({ type: 'contentChange', content });
+      });
+
+      editor.onDidChangeCursorPosition((e) => {
+        postMessage({
+          type: 'cursorChange',
+          line: e.position.lineNumber,
+          column: e.position.column,
+        });
+      });
+
+      editor.onDidChangeModelDecorations(() => {
+        const model = editor.getModel();
+        if (model) {
+          const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+          postMessage({
+            type: 'diagnostics',
+            errors: markers.filter(m => m.severity === 8).length,
+            warnings: markers.filter(m => m.severity === 4).length,
+          });
+        }
+      });
+
+      // Signal ready
+      postMessage({ type: 'ready' });
+    });
+
+    // --- INTELLISENSE / AUTOCOMPLETE SETUP ---
+    function setupIntelliSense() {
+      // JavaScript / TypeScript enhanced completions
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
+
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.CommonJS,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        reactNamespace: 'React',
+        allowJs: true,
+        typeRoots: ['node_modules/@types'],
+      });
+
+      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.CommonJS,
+        strict: true,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        reactNamespace: 'React',
+        allowJs: true,
+      });
+
+      // Python snippets completion provider
+      monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: function(model, position) {
+          const word = model.getWordUntilPosition(position);
+          const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+          };
+          return {
+            suggestions: [
+              { label: 'def', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'def ${1:function_name}(${2:args}):\n\t${3:pass}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: 'Define a function', range },
+              { label: 'class', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'class ${1:ClassName}:\n\tdef __init__(self):\n\t\t${2:pass}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: 'Define a class', range },
+              { label: 'for', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'for ${1:item} in ${2:iterable}:\n\t${3:pass}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: 'For loop', range },
+              { label: 'if', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'if ${1:condition}:\n\t${2:pass}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: 'If statement', range },
+              { label: 'try', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:e}:\n\t${4:pass}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: 'Try/except block', range },
+              { label: 'import', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'import ${1:module}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                range },
+              { label: 'print', kind: monaco.languages.CompletionItemKind.Function,
+                insertText: 'print(${1:value})',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                range },
+              { label: 'list', kind: monaco.languages.CompletionItemKind.Class,
+                insertText: '[${1:items}]',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                range },
+              { label: 'dict', kind: monaco.languages.CompletionItemKind.Class,
+                insertText: '{${1:key}: ${2:value}}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                range },
+              { label: 'lambda', kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: 'lambda ${1:args}: ${2:expression}',
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                range },
+            ]
+          };
+        }
+      });
+    }
+
+    // --- MESSAGE BRIDGE (React Native <-> WebView) ---
+    function postMessage(data) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      }
+    }
+
+    // Handle messages FROM React Native
+    window.addEventListener('message', handleMessage);
+    document.addEventListener('message', handleMessage); // Android
+
+    function handleMessage(event) {
+      try {
+        const msg = JSON.parse(event.data);
+        handleEditorCommand(msg);
+      } catch(e) {
+        console.error('Message parse error:', e);
+      }
+    }
+
+    function handleEditorCommand(msg) {
+      if (!editor) return;
+
+      switch(msg.type) {
+        case 'setContent':
+          editor.setValue(msg.content || '');
+          break;
+
+        case 'setLanguage':
+          const model = editor.getModel();
+          if (model) {
+            monaco.editor.setModelLanguage(model, msg.language);
+          }
+          break;
+
+        case 'setTheme':
+          const theme = msg.theme === 'light' ? 'pocketdev-light' : 'pocketdev-dark';
+          monaco.editor.setTheme(theme);
+          currentTheme = theme;
+          document.body.style.background = msg.theme === 'light' ? '#fff' : '#0D1117';
+          break;
+
+        case 'setFontSize':
+          editor.updateOptions({ fontSize: msg.size });
+          break;
+
+        case 'setWordWrap':
+          editor.updateOptions({ wordWrap: msg.enabled ? 'on' : 'off' });
+          break;
+
+        case 'getContent':
+          postMessage({ type: 'content', content: editor.getValue(), requestId: msg.requestId });
+          break;
+
+        case 'format':
+          editor.getAction('editor.action.formatDocument')?.run();
+          break;
+
+        case 'undo':
+          editor.trigger('keyboard', 'undo', null);
+          break;
+
+        case 'redo':
+          editor.trigger('keyboard', 'redo', null);
+          break;
+
+        case 'find':
+          editor.getAction('actions.find')?.run();
+          break;
+
+        case 'findReplace':
+          editor.getAction('editor.action.startFindReplaceAction')?.run();
+          break;
+
+        case 'goToLine':
+          editor.revealLineInCenter(msg.line);
+          editor.setPosition({ lineNumber: msg.line, column: 1 });
+          break;
+
+        case 'addTypeDefinition':
+          // Add type definitions for better IntelliSense
+          monaco.languages.typescript.javascriptDefaults.addExtraLib(
+            msg.content, msg.filename
+          );
+          break;
+
+        case 'setDiagnostics':
+          // Manually add diagnostic markers
+          const targetModel = editor.getModel();
+          if (targetModel && msg.markers) {
+            monaco.editor.setModelMarkers(targetModel, 'runtime', msg.markers);
+          }
+          break;
+
+        case 'focus':
+          editor.focus();
+          break;
+
+        case 'insertText':
+          const sel = editor.getSelection();
+          editor.executeEdits('insert', [{
+            range: sel || new monaco.Range(1, 1, 1, 1),
+            text: msg.text,
+          }]);
+          editor.focus();
+          break;
+
+        case 'toggleMinimap':
+          editor.updateOptions({ minimap: { enabled: msg.enabled } });
+          break;
+
+        case 'toggleLineNumbers':
+          editor.updateOptions({ lineNumbers: msg.enabled ? 'on' : 'off' });
+          break;
+      }
+    }
+
+    // --- TOOLBAR HELPERS ---
+    function insertText(text) {
+      if (!editor) return;
+      const selection = editor.getSelection();
+      editor.executeEdits('mobile-toolbar', [{
+        range: selection,
+        text: text,
+        forceMoveMarkers: true,
+      }]);
+      editor.focus();
+    }
+
+    function moveCursor(direction) {
+      if (!editor) return;
+      const pos = editor.getPosition();
+      const model = editor.getModel();
+      if (!pos || !model) return;
+
+      switch(direction) {
+        case 'up':
+          editor.setPosition({ lineNumber: Math.max(1, pos.lineNumber - 1), column: pos.column });
+          break;
+        case 'down':
+          editor.setPosition({ lineNumber: Math.min(model.getLineCount(), pos.lineNumber + 1), column: pos.column });
+          break;
+        case 'left':
+          editor.setPosition({ lineNumber: pos.lineNumber, column: Math.max(1, pos.column - 1) });
+          break;
+        case 'right':
+          const lineLength = model.getLineLength(pos.lineNumber);
+          editor.setPosition({ lineNumber: pos.lineNumber, column: Math.min(lineLength + 1, pos.column + 1) });
+          break;
+        case 'home':
+          editor.setPosition({ lineNumber: pos.lineNumber, column: 1 });
+          break;
+        case 'end':
+          editor.setPosition({ lineNumber: pos.lineNumber, column: model.getLineLength(pos.lineNumber) + 1 });
+          break;
+      }
+      editor.focus();
+    }
+
+    function editorAction(action) {
+      if (!editor) return;
+      editor.trigger('toolbar', action, null);
+      editor.focus();
+    }
+
+    function triggerSuggest() {
+      if (!editor) return;
+      editor.trigger('toolbar', 'editor.action.triggerSuggest', null);
+    }
+
+    function formatDocument() {
+      if (!editor) return;
+      editor.getAction('editor.action.formatDocument')?.run();
+    }
+
+    function findReplace() {
+      if (!editor) return;
+      editor.getAction('editor.action.startFindReplaceAction')?.run();
+    }
+  </script>
+</body>
+</html>

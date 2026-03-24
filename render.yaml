@@ -1,0 +1,20 @@
+# render.yaml — Render.com deployment config
+services:
+  - type: web
+    name: pocketdev-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MAX_EXEC_TIME
+        value: 30
+    autoDeploy: true
+    plan: free
